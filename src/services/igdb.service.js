@@ -21,40 +21,44 @@ const getAccessToken = async () => {
 const makeRequest = async (endpoint, body) => {
   const token = await getAccessToken();
 
-  const response = await axios.post(
-    `https://api.igdb.com/v4/${endpoint}`,
-    body,
-    {
-      headers: {
-        'Client-ID': process.env.IGDB_CLIENT_ID,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'text/plain'
+  try {
+    const response = await axios.post(
+      `https://api.igdb.com/v4/${endpoint}`,
+      body,
+      {
+        headers: {
+          'Client-ID': process.env.IGDB_CLIENT_ID,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'text/plain'
+        }
       }
-    }
-  );
-
-  return response.data;
+    );
+    return response.data;
+  } catch (err) {
+    throw err;
+  }
 };
 
 export const searchGames = async (query, limit = 20) => {
   const body = `
     search "${query}";
     fields id, name, cover.url, first_release_date, summary, rating, rating_count;
-    where category = (0,1,2,3,4,8,9,10,11) & version_parent = null;
     limit ${limit};
   `;
 
   const games = await makeRequest('games', body);
 
-  return games.map(game => ({
-    id: game.id,
-    name: game.name,
-    cover: game.cover ? game.cover.url.replace('t_thumb', 't_cover_big') : null,
-    release_date: game.first_release_date ? new Date(game.first_release_date * 1000).toISOString().split('T')[0] : null,
-    summary: game.summary || null,
-    rating: game.rating ? Math.round(game.rating) : null,
-    rating_count: game.rating_count || 0
-  }));
+  return games
+    .sort((a, b) => (b.rating_count || 0) - (a.rating_count || 0))
+    .map(game => ({
+      id: game.id,
+      name: game.name,
+      cover: game.cover ? game.cover.url.replace('t_thumb', 't_cover_big') : null,
+      release_date: game.first_release_date ? new Date(game.first_release_date * 1000).toISOString().split('T')[0] : null,
+      summary: game.summary || null,
+      rating: game.rating ? Math.round(game.rating) : null,
+      rating_count: game.rating_count || 0
+    }));
 };
 
 export const getGameById = async (id) => {
